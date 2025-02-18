@@ -15,6 +15,7 @@ namespace LinkedOut.Controllers
 
         public IActionResult Index()
         {
+            //sdsdddddd
             return View();
         }
 
