@@ -19,7 +19,7 @@ namespace LinkedOut.Controllers
             //dsadassda
             return View();
         }
-
+        //Fjdþfvnvn
         public IActionResult Privacy()
         {
             return View();
