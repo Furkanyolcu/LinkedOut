@@ -38,6 +38,7 @@ public class AuthController : Controller
             HttpContext.Session.SetString("Username", user.Username);
             HttpContext.Session.SetString("Email", user.Email);
             TempData["Success"] = "Giriş başarılı!";
+            return RedirectToAction("HomePage", "Home");
         }
         else
         {
@@ -67,7 +68,7 @@ public class AuthController : Controller
         {
             Username = username,
             Email = email,
-            Password = password, // Şifre düz metin olarak kaydediliyor.
+            Password = password, 
             isActive = true
         };
 
