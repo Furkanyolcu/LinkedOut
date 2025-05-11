@@ -1,1 +1,23 @@
-﻿@RenderBody()
+﻿<!DOCTYPE html>
+<html lang="en-US" dir="ltr">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@ViewData["Title"] - LinkedOut</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/falcon/falcon/public/assets/img/favicons/favicon-32x32.png">
+    <link href="/falcon/falcon/public/vendors/simplebar/simplebar.min.css" rel="stylesheet">
+    <link href="/falcon/falcon/public/assets/css/theme.min.css" rel="stylesheet" id="style-default">
+    <link href="/falcon/falcon/public/assets/css/user.min.css" rel="stylesheet" id="user-style-default">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,500,600,700%7cPoppins:300,400,500,600,700,800,900&display=swap" rel="stylesheet">
+    @RenderSection("Styles", required: false)
+</head>
+<body>
+    <main class="main" id="top">
+        @RenderBody()
+    </main>
+    <script src="/falcon/falcon/public/vendors/simplebar/simplebar.min.js"></script>
+    <script src="/falcon/falcon/public/assets/js/theme.js"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

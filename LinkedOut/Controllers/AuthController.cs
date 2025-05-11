@@ -1,87 +1,74 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
-using System.Linq;
+using Microsoft.AspNetCore.Mvc;
 using LinkedOut.Models;
-using Microsoft.AspNetCore.Authorization;
+using System.Linq;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Security.Claims;
 
-public class AuthController : Controller
+namespace LinkedOut.Controllers
 {
-    private readonly Context _context;
+    public class AuthController : Controller
+    {
+        private readonly ApplicationDbContext _context;
 
-    public AuthController(Context context)
-    {
-        _context = context;
-    }
-
-    [HttpGet]
-    public IActionResult Index()
-    {
-        return View();
-    }
-    [HttpPost]
-    [AllowAnonymous]
-    public IActionResult Login(string Username, string password)
-    {
-        if (string.IsNullOrEmpty(Username) || string.IsNullOrEmpty(password))
+        public AuthController(ApplicationDbContext context)
         {
-            TempData["Error"] = "Kullanıcı adı ve Şifre alanları doldurulmalıdır.";
-            return RedirectToAction("Index");
+            _context = context;
         }
 
-        var user = _context.Auths.FirstOrDefault(u =>
-            u.Username == Username &&
-            u.Password == password &&
-            u.isActive);
-
-        if (user != null)
+        [HttpGet]
+        public IActionResult Index()
         {
-            HttpContext.Session.SetString("Username", user.Username);
-            HttpContext.Session.SetString("Email", user.Email);
-            TempData["Success"] = "Giriş başarılı!";
-            return RedirectToAction("HomePage", "Home");
-        }
-        else
-        {
-            TempData["Error"] = "Giriş bilgileri hatalı veya kullanıcı aktif değil.";
+            return View();
         }
 
-        return RedirectToAction("Index");
+        [HttpPost]
+        public IActionResult Login(string Username, string Password)
+        {
+            var user = _context.Users.FirstOrDefault(u => u.FirstName == Username && u.PasswordHash == Password);
+            if (user != null)
+            {
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, user.FirstName),
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new Claim(ClaimTypes.Email, user.Email)
+                };
+                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var principal = new ClaimsPrincipal(identity);
+                HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal).Wait();
+                return RedirectToAction("HomePage", "Home");
+            }
+            TempData["Error"] = "Kullanıcı adı veya şifre hatalı!";
+            return View("~/Views/Auth/Index.cshtml");
+        }
+
+        [HttpPost]
+        public IActionResult Register(string Username, string Email, string Password)
+        {
+            if (_context.Users.Any(u => u.Email == Email || u.FirstName == Username))
+            {
+                TempData["Error2"] = "Bu kullanıcı adı veya e-posta zaten kullanılıyor.";
+                return View("~/Views/Auth/Index.cshtml");
+            }
+
+            var newUser = new User
+            {
+                FirstName = Username,
+                LastName = string.Empty,
+                Email = Email,
+                PasswordHash = Password,
+                ProfilePicture = string.Empty,
+                Headline = string.Empty,
+                About = string.Empty,
+                Location = string.Empty,
+                Website = string.Empty
+            };
+            _context.Users.Add(newUser);
+            _context.SaveChanges();
+
+            TempData["Success2"] = "Kayıt işlemi başarılı! Şimdi giriş yapabilirsiniz.";
+            return View("~/Views/Auth/Index.cshtml");
+        }
     }
-
-    [HttpPost]
-    [AllowAnonymous]
-    public IActionResult Register(string username, string email, string password)
-    {
-        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
-        {
-            TempData["Error2"] = "Tüm alanları doldurmalısınız.";
-            return RedirectToAction("Index");
-        }
-
-        if (_context.Auths.Any(u => u.Email == email || u.Username == username))
-        {
-            TempData["Error2"] = "Bu kullanıcı adı veya e-posta zaten kullanılıyor.";
-            return RedirectToAction("Index");
-        }
-
-        var newUser = new Auth
-        {
-            Username = username,
-            Email = email,
-            Password = password, 
-            isActive = true
-        };
-
-        _context.Auths.Add(newUser);
-        _context.SaveChanges();
-
-        TempData["Success2"] = "Kayıt işlemi başarılı! Şimdi giriş yapabilirsiniz.";
-        return RedirectToAction("Index");
-    }
-
-    public IActionResult Logout()
-    {
-        HttpContext.Session.Clear();
-        return RedirectToAction("Index");
-    }
-}
+} 

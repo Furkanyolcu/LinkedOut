@@ -1,21 +1,38 @@
 using Microsoft.EntityFrameworkCore;
-using LinkedOut.Models;  // DbContext sýnýfýnýzýn bulunduðu namespace
+using LinkedOut.Models;  // DbContext sï¿½nï¿½fï¿½nï¿½zï¿½n bulunduï¿½u namespace
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Baðlantý dizesini appsettings.json'dan al
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
-builder.Services.AddDistributedMemoryCache(); // Session servisini ekleyelim kardeþþþþþþ 
-builder.Services.AddSession(); // bu da session aþaðýda da orta katman var app de
-
-builder.Services.AddDbContext<Context>(options =>
-    options.UseSqlServer(connectionString));  // DbContext'i yapýlandýr
-
+// Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Configure DbContext
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Add Authentication
+builder.Services.AddAuthentication("Cookies")
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.AccessDeniedPath = "/Account/AccessDenied";
+    });
+
+// Add Authorization
+builder.Services.AddAuthorization();
+
+// Add Session
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
 
 var app = builder.Build();
 
+// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -23,12 +40,16 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseRouting();
-app.UseSession(); // session middleware
-app.UseAuthorization();
-app.MapStaticAssets();
+app.UseStaticFiles();
 
-// Controller route ve static asset'leri düzenleyelim
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.UseSession();
+
+// Controller route ve static asset'leri dzenleyelim
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Auth}/{action=Index}/{id?}")
