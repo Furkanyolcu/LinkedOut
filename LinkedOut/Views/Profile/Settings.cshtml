@@ -698,6 +698,23 @@
               </div>
             </div>
           </div>
+          
+          <!-- Alert Messages -->
+          @if (TempData["SuccessMessage"] != null)
+          {
+              <div class="alert alert-success alert-dismissible fade show" role="alert">
+                  @TempData["SuccessMessage"]
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+          }
+          @if (TempData["ErrorMessage"] != null)
+          {
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                  @TempData["ErrorMessage"]
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+          }
+          
           <div class="row g-0">
             <div class="col-lg-8 pe-lg-2">
               <div class="card mb-3">
@@ -705,18 +722,6 @@
                   <h5 class="mb-0">Profile Settings</h5>
                 </div>
                 <div class="card-body bg-light">
-                  @if (TempData["SuccessMessage"] != null)
-                  {
-                      <div class="alert alert-success mb-3" role="alert">
-                          @TempData["SuccessMessage"]
-                      </div>
-                  }
-                  @if (TempData["ErrorMessage"] != null)
-                  {
-                      <div class="alert alert-danger mb-3" role="alert">
-                          @TempData["ErrorMessage"]
-                      </div>
-                  }
                   <form class="row g-3" id="profile-form" method="post" action="/Profile/UpdateProfile">
                     <div class="col-lg-6">
                       <label class="form-label" for="first-name">First Name</label>
@@ -732,7 +737,7 @@
                     </div>
                     <div class="col-lg-6">
                       <label class="form-label" for="email2">Phone</label>
-                      <input class="form-control" id="email2" name="phone" type="text" value="" />
+                      <input class="form-control" id="email2" name="phone" type="text" value="@ViewBag.User.Phone" />
                     </div>
                     <div class="col-lg-12">
                       <label class="form-label" for="email3">Heading</label>
@@ -754,34 +759,34 @@
                 </div>
                 <div class="card-body bg-light"><a class="mb-4 d-block d-flex align-items-center" href="#experience-form1" data-bs-toggle="collapse" aria-expanded="false" aria-controls="experience-form1"><span class="circle-dashed"><span class="fas fa-plus"></span></span><span class="ms-3">Add new experience</span></a>
                   <div class="collapse" id="experience-form1">
-                    <form class="row">
+                    <form class="row" id="experience-form" method="post" action="/Profile/SaveExperience">
                       <div class="col-3 mb-3 text-lg-end">
                         <label class="form-label" for="company">Company</label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm" id="company" type="text" />
+                        <input class="form-control form-control-sm" id="company" name="Company" type="text" required />
                       </div>
                       <div class="col-3 mb-3 text-lg-end">
                         <label class="form-label" for="position">Position</label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm" id="position" type="text" />
+                        <input class="form-control form-control-sm" id="position" name="Position" type="text" required />
                       </div>
                       <div class="col-3 mb-3 text-lg-end">
                         <label class="form-label" for="city">City </label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm" id="city" type="text" />
+                        <input class="form-control form-control-sm" id="city" name="City" type="text" />
                       </div>
                       <div class="col-3 mb-3 text-lg-end">
                         <label class="form-label" for="exp-description">Description </label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <textarea class="form-control form-control-sm" id="exp-description" rows="3"> </textarea>
+                        <textarea class="form-control form-control-sm" id="exp-description" name="Description" rows="3"></textarea>
                       </div>
                       <div class="col-9 col-sm-7 offset-3 mb-3">
                         <div class="form-check mb-0 lh-1">
-                          <input class="form-check-input" type="checkbox" id="experience-current" checked="checked" />
+                          <input class="form-check-input" type="checkbox" id="experience-current" name="IsCurrentJob" checked="checked" />
                           <label class="form-check-label mb-0" for="experience-current">I currently work here
                           </label>
                         </div>
@@ -790,49 +795,95 @@
                         <label class="form-label" for="experience-form2">From </label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm text-500 datetimepicker" id="experience-form2" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y","disableMobile":true}' />
+                        <input class="form-control form-control-sm text-500 datetimepicker" id="experience-form2" name="StartDate" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y","disableMobile":true}' required />
                       </div>
                       <div class="col-3 text-lg-end">
                         <label class="form-label" for="experience-to">To </label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm text-500 datetimepicker" id="experience-to" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y","disableMobile":true}' />
+                        <input class="form-control form-control-sm text-500 datetimepicker" id="experience-to" name="EndDate" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y","disableMobile":true}' />
                       </div>
                       <div class="col-9 col-sm-7 offset-3">
-                        <button class="btn btn-primary" type="button">Save</button>
+                        <button class="btn btn-primary" type="submit">Save</button>
                       </div>
                     </form>
                     <div class="border-dashed-bottom my-4"></div>
                   </div>
-                  <div class="d-flex"><a href="#!"> <img class="img-fluid" src="~/falcon/falcon/public/assets/img/logos/g.png" alt="" width="56" /></a>
-                    <div class="flex-1 position-relative ps-3">
-                      <h6 class="fs-0 mb-0">Big Data Engineer<span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"><small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small></span>
-                      </h6>
-                      <p class="mb-1"> <a href="#!">Google</a></p>
-                      <p class="text-1000 mb-0">Apr 2012 - Present &bull; 6 yrs 9 mos</p>
-                      <p class="text-1000 mb-0">California, USA</p>
-                      <div class="border-bottom border-dashed my-3"></div>
-                    </div>
-                  </div>
-                  <div class="d-flex"><a href="#!"> <img class="img-fluid" src="~/falcon/falcon/public/assets/img/logos/apple.png" alt="" width="56" /></a>
-                    <div class="flex-1 position-relative ps-3">
-                      <h6 class="fs-0 mb-0">Software Engineer<span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"><small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small></span>
-                      </h6>
-                      <p class="mb-1"> <a href="#!">Apple</a></p>
-                      <p class="text-1000 mb-0">Jan 2012 - Apr 2012 &bull; 4 mos</p>
-                      <p class="text-1000 mb-0">California, USA</p>
-                      <div class="border-bottom border-dashed my-3"></div>
-                    </div>
-                  </div>
-                  <div class="d-flex"><a href="#!"> <img class="img-fluid" src="~/falcon/falcon/public/assets/img/logos/nike.png" alt="" width="56" /></a>
-                    <div class="flex-1 position-relative ps-3">
-                      <h6 class="fs-0 mb-0">Mobile App Developer<span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"><small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small></span>
-                      </h6>
-                      <p class="mb-1"> <a href="#!">Nike</a></p>
-                      <p class="text-1000 mb-0">Jan 2011 - Apr 2012 &bull; 1 yr 4 mos</p>
-                      <p class="text-1000 mb-0">Beaverton, USA</p>
-                    </div>
-                  </div>
+                  
+                  @if (ViewBag.Experiences != null && ViewBag.Experiences.Count > 0)
+                  {
+                      foreach (var exp in ViewBag.Experiences)
+                      {
+                          if (exp != null)
+                          {
+                              <div class="d-flex">
+                                  <a href="#!"> 
+                                      <div class="avatar avatar-3xl">
+                                          <div class="avatar-name rounded-circle bg-soft-primary text-primary">
+                                              <span>@(string.IsNullOrEmpty(exp.Company) ? "E" : (exp.Company.Length > 0 ? exp.Company[0].ToString() : "E"))</span>
+                                          </div>
+                                      </div>
+                                  </a>
+                                  <div class="flex-1 position-relative ps-3">
+                                      <h6 class="fs-0 mb-0">
+                                          @(string.IsNullOrEmpty(exp.Position) ? "Position" : exp.Position)
+                                          <span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified">
+                                              <small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small>
+                                          </span>
+                                      </h6>
+                                      <p class="mb-1"> <a href="#!">@(string.IsNullOrEmpty(exp.Company) ? "Company" : exp.Company)</a></p>
+                                      <p class="text-1000 mb-0">
+                                          @try
+                                          {
+                                              @(exp.StartDate.ToString("MMM yyyy"))@: - 
+                                              @(exp.IsCurrentJob ? "Present" : ((exp.EndDate != null) ? exp.EndDate.Value.ToString("MMM yyyy") : "Present"))
+                                              @: • 
+                                              
+                                              int years = 0, months = 0;
+                                              DateTime endDate = exp.IsCurrentJob ? DateTime.Now : (exp.EndDate.HasValue ? exp.EndDate.Value : DateTime.Now);
+                                              years = endDate.Year - exp.StartDate.Year;
+                                              months = endDate.Month - exp.StartDate.Month;
+                                              
+                                              if (months < 0)
+                                              {
+                                                  years--;
+                                                  months += 12;
+                                              }
+                                              
+                                              if (years > 0)
+                                              {
+                                                  @years <text> yr </text>
+                                              }
+                                              if (months > 0)
+                                              {
+                                                  @months <text> mos</text>
+                                              }
+                                          }
+                                          catch
+                                          {
+                                              <span>Date Information Unavailable</span>
+                                          }
+                                      </p>
+                                      @if (!string.IsNullOrEmpty(exp.City))
+                                      {
+                                          <p class="text-1000 mb-0">@exp.City</p>
+                                      }
+                                      @if (!string.IsNullOrEmpty(exp.Description))
+                                      {
+                                          <p class="text-1000 mb-0">@exp.Description</p>
+                                      }
+                                      <div class="border-bottom border-dashed my-3"></div>
+                                  </div>
+                              </div>
+                          }
+                      }
+                  }
+                  else
+                  {
+                      <div class="text-center my-4">
+                          <p class="text-muted">No experiences added yet. Click "Add new experience" to get started.</p>
+                      </div>
+                  }
                 </div>
               </div>
               <div class="card mb-3 mb-lg-0">
@@ -841,73 +892,102 @@
                 </div>
                 <div class="card-body bg-light"><a class="mb-4 d-block d-flex align-items-center" href="#education-form" data-bs-toggle="collapse" aria-expanded="false" aria-controls="education-form"><span class="circle-dashed"><span class="fas fa-plus"></span></span><span class="ms-3">Add new education</span></a>
                   <div class="collapse" id="education-form">
-                    <form class="row">
+                    <form class="row" method="post" action="/Profile/SaveEducation">
                       <div class="col-3 mb-3 text-lg-end">
                         <label class="form-label" for="school">School</label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm" id="school" type="text" />
+                        <input class="form-control form-control-sm" id="school" name="School" type="text" required />
                       </div>
                       <div class="col-3 mb-3 text-lg-end">
                         <label class="form-label" for="degree">Degree</label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm" id="degree" type="text" />
+                        <input class="form-control form-control-sm" id="degree" name="Degree" type="text" required />
                       </div>
                       <div class="col-3 mb-3 text-lg-end">
                         <label class="form-label" for="field">Field</label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm" id="field" type="text" />
+                        <input class="form-control form-control-sm" id="field" name="Field" type="text" />
                       </div>
-                      <div class="col-3 text-lg-end">
-                        <label class="form-label" for="edu-form3">From </label>
-                      </div>
-                      <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm datetimepicker" id="edu-form3" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y"}' />
-                      </div>
-                      <div class="col-3 text-lg-end">
-                        <label class="form-label" for="edu-to">To </label>
+                      <div class="col-3 mb-3 text-lg-end">
+                        <label class="form-label" for="location">Location</label>
                       </div>
                       <div class="col-9 col-sm-7 mb-3">
-                        <input class="form-control form-control-sm datetimepicker" id="edu-to" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y"}' />
+                        <input class="form-control form-control-sm" id="location" name="Location" type="text" />
+                      </div>
+                      <div class="col-3 text-lg-end">
+                        <label class="form-label" for="edu-start">From </label>
+                      </div>
+                      <div class="col-9 col-sm-7 mb-3">
+                        <input class="form-control form-control-sm text-500 datetimepicker" id="edu-start" name="StartDate" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y","disableMobile":true}' required />
+                      </div>
+                      <div class="col-3 text-lg-end">
+                        <label class="form-label" for="edu-end">To </label>
+                      </div>
+                      <div class="col-9 col-sm-7 mb-3">
+                        <input class="form-control form-control-sm text-500 datetimepicker" id="edu-end" name="EndDate" type="text" placeholder="d/m/y" data-options='{"dateFormat":"d/m/y","disableMobile":true}' />
                       </div>
                       <div class="col-9 col-sm-7 offset-3">
-                        <button class="btn btn-primary" type="button">Save</button>
+                        <button class="btn btn-primary" type="submit">Save</button>
                       </div>
                     </form>
-                    <div class="border-dashed-bottom my-3"></div>
+                    <div class="border-dashed-bottom my-4"></div>
                   </div>
-                  <div class="d-flex"><a href="#!">
-                      <div class="avatar avatar-3xl">
-                        <div class="avatar-name rounded-circle"><span>SU</span></div>
+                  
+                  @if (ViewBag.Educations != null && ViewBag.Educations.Count > 0)
+                  {
+                      foreach (var edu in ViewBag.Educations)
+                      {
+                          if (edu != null)
+                          {
+                              <div class="d-flex">
+                                  <a href="#!"> 
+                                      <div class="avatar avatar-3xl">
+                                          <div class="avatar-name rounded-circle bg-soft-primary text-primary">
+                                              <span>@(string.IsNullOrEmpty(edu.School) ? "S" : (edu.School.Length > 0 ? edu.School[0].ToString() : "S"))</span>
+                                          </div>
+                                      </div>
+                                  </a>
+                                  <div class="flex-1 position-relative ps-3">
+                                      <h6 class="fs-0 mb-0">
+                                          @(string.IsNullOrEmpty(edu.Degree) ? "Degree" : edu.Degree)
+                                          <span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified">
+                                              <small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small>
+                                          </span>
+                                      </h6>
+                                      <p class="mb-1"> 
+                                          <a href="#!">@(string.IsNullOrEmpty(edu.School) ? "School" : edu.School)</a>
+                                      </p>
+                                      <p class="text-1000 mb-0">
+                                          @try
+                                          {
+                                              @(edu.StartDate.ToString("MMM yyyy"))@: - 
+                                              @(edu.EndDate != null ? edu.EndDate.Value.ToString("MMM yyyy") : "Present")
+                                          }
+                                          catch
+                                          {
+                                              <span>Date Information Unavailable</span>
+                                          }
+                                      </p>
+                                      <p class="text-1000 mb-0">@(string.IsNullOrEmpty(edu.Field) ? "" : edu.Field)</p>
+                                      @if (!string.IsNullOrEmpty(edu.Location))
+                                      {
+                                          <p class="text-1000 mb-0">@edu.Location</p>
+                                      }
+                                      <div class="border-bottom border-dashed my-3"></div>
+                                  </div>
+                              </div>
+                          }
+                      }
+                  }
+                  else
+                  {
+                      <div class="text-center my-4">
+                          <p class="text-muted">No educations added yet. Click "Add new education" to get started.</p>
                       </div>
-                    </a>
-                    <div class="flex-1 position-relative ps-3">
-                      <h6 class="fs-0 mb-0"> <a href="#!">Stanford University<span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"><small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small></span></a></h6>
-                      <p class="mb-1">Computer Science and Engineering</p>
-                      <p class="text-1000 mb-0">2010 - 2014 • 4 yrs</p>
-                      <p class="text-1000 mb-0">California, USA</p>
-                      <div class="border-bottom border-dashed my-3"></div>
-                    </div>
-                  </div>
-                  <div class="d-flex"><a href="#!"> <img class="img-fluid" src="~/falcon/falcon/public/assets/img/logos/staten.png" alt="" width="56" /></a>
-                    <div class="flex-1 position-relative ps-3">
-                      <h6 class="fs-0 mb-0"> <a href="#!">Staten Island Technical High School<span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"><small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small></span></a></h6>
-                      <p class="mb-1">Higher Secondary School Certificate, Science</p>
-                      <p class="text-1000 mb-0">2008 - 2010 &bull; 2 yrs</p>
-                      <p class="text-1000 mb-0">New York, USA</p>
-                      <div class="border-bottom border-dashed my-3"></div>
-                    </div>
-                  </div>
-                  <div class="d-flex"><a href="#!"> <img class="img-fluid" src="~/falcon/falcon/public/assets/img/logos/tj-heigh-school.png" alt="" width="56" /></a>
-                    <div class="flex-1 position-relative ps-3">
-                      <h6 class="fs-0 mb-0"> <a href="#!">Thomas Jefferson High School for Science and Technology<span data-bs-toggle="tooltip" data-bs-placement="top" title="Verified"><small class="fa fa-check-circle text-primary" data-fa-transform="shrink-4 down-2"></small></span></a></h6>
-                      <p class="mb-1">Secondary School Certificate, Science</p>
-                      <p class="text-1000 mb-0">2003 - 2008 &bull; 5 yrs</p>
-                      <p class="text-1000 mb-0">Alexandria, USA</p>
-                    </div>
-                  </div>
+                  }
                 </div>
               </div>
             </div>
@@ -978,7 +1058,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="card mb-3">
+                @* <div class="card mb-3">
                   <div class="card-header">
                     <h5 class="mb-0">Billing Setting</h5>
                   </div>
@@ -990,30 +1070,30 @@
                     <h5>Payment</h5>
                     <p class="fs-0">You have not added any payment.</p><a class="btn btn-falcon-default btn-sm" href="#!">Add Payment </a>
                   </div>
-                </div>
+                </div> *@
                 <div class="card mb-3">
                   <div class="card-header">
                     <h5 class="mb-0">Change Password</h5>
                   </div>
                   <div class="card-body bg-light">
-                    <form>
+                    <form method="post" action="/Profile/ChangePassword">
                       <div class="mb-3">
                         <label class="form-label" for="old-password">Old Password</label>
-                        <input class="form-control" id="old-password" type="password" />
+                        <input class="form-control" id="old-password" name="oldPassword" type="password" required />
                       </div>
                       <div class="mb-3">
                         <label class="form-label" for="new-password">New Password</label>
-                        <input class="form-control" id="new-password" type="password" />
+                        <input class="form-control" id="new-password" name="newPassword" type="password" required />
                       </div>
                       <div class="mb-3">
                         <label class="form-label" for="confirm-password">Confirm Password</label>
-                        <input class="form-control" id="confirm-password" type="password" />
+                        <input class="form-control" id="confirm-password" name="confirmPassword" type="password" required />
                       </div>
-                      <button class="btn btn-primary d-block w-100" type="submit">Update Password </button>
+                      <button class="btn btn-primary d-block w-100" type="submit">Update Password</button>
                     </form>
                   </div>
                 </div>
-                <div class="card">
+              @*   <div class="card">
                   <div class="card-header">
                     <h5 class="mb-0">Danger Zone</h5>
                   </div>
@@ -1024,7 +1104,7 @@
                     <h5 class="fs-0">Delete this account</h5>
                     <p class="fs--1">Once you delete a account, there is no going back. Please be certain.</p><a class="btn btn-falcon-danger d-block" href="#!">Deactivate Account</a>
                   </div>
-                </div>
+                </div> *@
               </div>
             </div>
           </div>
@@ -1220,6 +1300,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
     <!-- Profile JS -->
     <script src="~/js/profile.js"></script>
+    <!-- Experience JS -->
+    <script src="~/js/experience.js"></script>
     
   </body>
 

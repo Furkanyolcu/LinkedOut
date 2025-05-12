@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.IO;
 using Microsoft.AspNetCore.Hosting;
 using System.Text.Json;
+using BCrypt.Net;
 
 namespace LinkedOut.Controllers
 {
@@ -88,12 +89,13 @@ namespace LinkedOut.Controllers
                         u.FirstName,
                         u.LastName, 
                         u.Email,
+                        u.Phone,
                         u.ProfilePicture,
                         u.Headline,
                         u.About,
                         u.Location,
                         u.Website,
-                        CoverPhoto = string.Empty // Provide an empty default
+                        u.CoverPhoto
                     })
                     .FirstOrDefaultAsync();
 
@@ -102,8 +104,22 @@ namespace LinkedOut.Controllers
                     return NotFound();
                 }
 
+                // Load user's experiences
+                var experiences = await _context.Experiences
+                    .Where(e => e.UserId == userId)
+                    .OrderByDescending(e => e.StartDate)
+                    .ToListAsync();
+                
+                // Load user's educations
+                var educations = await _context.Educations
+                    .Where(e => e.UserId == userId)
+                    .OrderByDescending(e => e.StartDate)
+                    .ToListAsync();
+
                 // Model verilerini ViewBag'e ekle
                 ViewBag.User = user;
+                ViewBag.Experiences = experiences;
+                ViewBag.Educations = educations;
 
                 return View();
             }
@@ -119,7 +135,7 @@ namespace LinkedOut.Controllers
         public async Task<IActionResult> UpdateProfile(string firstName, string lastName, string email, string phone, string headline, string about)
         {
             System.Diagnostics.Debug.WriteLine("UpdateProfile method called");
-            System.Diagnostics.Debug.WriteLine($"Received data: firstName={firstName}, lastName={lastName}, email={email}, headline={headline}");
+            System.Diagnostics.Debug.WriteLine($"Received data: firstName={firstName}, lastName={lastName}, email={email}, phone={phone}, headline={headline}");
             
             try
             {
@@ -134,7 +150,7 @@ namespace LinkedOut.Controllers
                 }
                 
                 // Log incoming data
-                System.Diagnostics.Debug.WriteLine($"UpdateProfile: ID={userId}, FirstName={firstName}, LastName={lastName}, Email={email}, Headline={headline}");
+                System.Diagnostics.Debug.WriteLine($"UpdateProfile: ID={userId}, FirstName={firstName}, LastName={lastName}, Email={email}, Phone={phone}, Headline={headline}");
                 
                 try
                 {
@@ -144,6 +160,7 @@ namespace LinkedOut.Controllers
                         SET FirstName = @firstName, 
                             LastName = @lastName, 
                             Email = @email, 
+                            Phone = @phone,
                             Headline = @headline, 
                             About = @about
                         WHERE Id = @userId";
@@ -152,6 +169,7 @@ namespace LinkedOut.Controllers
                         new Microsoft.Data.SqlClient.SqlParameter("@firstName", firstName),
                         new Microsoft.Data.SqlClient.SqlParameter("@lastName", lastName),
                         new Microsoft.Data.SqlClient.SqlParameter("@email", email),
+                        new Microsoft.Data.SqlClient.SqlParameter("@phone", phone ?? string.Empty),
                         new Microsoft.Data.SqlClient.SqlParameter("@headline", headline ?? string.Empty),
                         new Microsoft.Data.SqlClient.SqlParameter("@about", about ?? string.Empty),
                         new Microsoft.Data.SqlClient.SqlParameter("@userId", userId)
@@ -181,7 +199,7 @@ namespace LinkedOut.Controllers
                     System.Diagnostics.Debug.WriteLine("Trying entity approach...");
                     
                     // Load only necessary user data
-                    var query = "SELECT Id, FirstName, LastName, Email, Headline, About FROM Users WHERE Id = @p0";
+                    var query = "SELECT Id, FirstName, LastName, Email, Phone, Headline, About FROM Users WHERE Id = @p0";
                     var user = await _context.Users.FromSqlRaw(query, userId).FirstOrDefaultAsync();
                     
                     if (user == null)
@@ -195,6 +213,7 @@ namespace LinkedOut.Controllers
                     user.FirstName = firstName;
                     user.LastName = lastName;
                     user.Email = email;
+                    user.Phone = phone ?? string.Empty;
                     user.Headline = headline ?? string.Empty;
                     user.About = about;
                     
@@ -203,6 +222,7 @@ namespace LinkedOut.Controllers
                         _context.Entry(user).Property(u => u.FirstName).IsModified = true;
                         _context.Entry(user).Property(u => u.LastName).IsModified = true;
                         _context.Entry(user).Property(u => u.Email).IsModified = true;
+                        _context.Entry(user).Property(u => u.Phone).IsModified = true;
                         _context.Entry(user).Property(u => u.Headline).IsModified = true;
                         _context.Entry(user).Property(u => u.About).IsModified = true;
                         
@@ -307,61 +327,90 @@ namespace LinkedOut.Controllers
                     TempData["ErrorMessage"] = "No file selected";
                     return RedirectToAction("Settings");
                 }
-
+                
                 // Get current user ID
                 var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-                System.Diagnostics.Debug.WriteLine($"Uploading cover image for user ID={userId}, File size={coverImage.Length}");
-
+                
+                // Generate file name and path
+                var fileName = $"cover_{userId}_{DateTime.Now.Ticks}{Path.GetExtension(coverImage.FileName)}";
+                var uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads");
+                
                 // Create directory if it doesn't exist
-                string uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads/covers");
                 if (!Directory.Exists(uploadsFolder))
                 {
                     Directory.CreateDirectory(uploadsFolder);
-                    System.Diagnostics.Debug.WriteLine($"Created directory: {uploadsFolder}");
                 }
-
-                // Generate unique filename
-                string uniqueFileName = $"{userId}_{Guid.NewGuid().ToString()}{Path.GetExtension(coverImage.FileName)}";
-                string filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                string fileUrl = $"/uploads/covers/{uniqueFileName}";
                 
-                System.Diagnostics.Debug.WriteLine($"Saving file to: {filePath}");
-
-                // Save the file
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                var filePath = Path.Combine(uploadsFolder, fileName);
+                
+                // Save file to disk
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
                 {
-                    await coverImage.CopyToAsync(stream);
+                    await coverImage.CopyToAsync(fileStream);
                 }
                 
-                System.Diagnostics.Debug.WriteLine($"File saved successfully");
+                // Update database with new file path
+                var webPath = $"/uploads/{fileName}";
+                
+                // Log what we're trying to do
+                System.Diagnostics.Debug.WriteLine($"Updating cover image for user {userId} to {webPath}");
+                
+                try
+                {
+                    // Direct SQL approach to update only the CoverPhoto field
+                    var updateQuery = @"
+                        UPDATE Users 
+                        SET CoverPhoto = @coverPhoto
+                        WHERE Id = @userId";
 
-                try {
-                    // Check if CoverPhoto column exists
-                    var columnCheck = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Users' AND COLUMN_NAME = 'CoverPhoto'";
-                    var columnExists = await _context.Database.ExecuteSqlRawAsync(columnCheck) > 0;
+                    var parameters = new[] {
+                        new Microsoft.Data.SqlClient.SqlParameter("@coverPhoto", webPath),
+                        new Microsoft.Data.SqlClient.SqlParameter("@userId", userId)
+                    };
+
+                    var rowsAffected = await _context.Database.ExecuteSqlRawAsync(updateQuery, parameters);
                     
-                    if (columnExists) {
-                        // Update using SQL
-                        var updateQuery = "UPDATE Users SET CoverPhoto = @coverPhoto WHERE Id = @userId";
-                        var parameters = new[] {
-                            new Microsoft.Data.SqlClient.SqlParameter("@coverPhoto", fileUrl),
-                            new Microsoft.Data.SqlClient.SqlParameter("@userId", userId)
-                        };
-                        
-                        await _context.Database.ExecuteSqlRawAsync(updateQuery, parameters);
-                        System.Diagnostics.Debug.WriteLine($"Cover photo URL updated in database: {fileUrl}");
-                    } else {
-                        System.Diagnostics.Debug.WriteLine("CoverPhoto column doesn't exist, skipping database update");
+                    if (rowsAffected > 0)
+                    {
+                        TempData["SuccessMessage"] = "Cover photo updated successfully!";
+                        return RedirectToAction("Settings");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("No rows were updated. User possibly not found.");
+                        TempData["ErrorMessage"] = "No changes were made. Please try again.";
+                        return RedirectToAction("Settings");
                     }
                 }
-                catch (Exception ex)
+                catch (Exception sqlEx)
                 {
-                    // Log error but continue - we still want to return the URL
-                    System.Diagnostics.Debug.WriteLine($"Error updating cover photo in database: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"SQL Error in UpdateCoverImage: {sqlEx.Message}");
+                    
+                    // Fallback to entity update
+                    var user = await _context.Users.FindAsync(userId);
+                    
+                    if (user == null)
+                    {
+                        TempData["ErrorMessage"] = "User not found. Please try again later.";
+                        return RedirectToAction("Settings");
+                    }
+                    
+                    user.CoverPhoto = webPath;
+                    
+                    try 
+                    {
+                        _context.Entry(user).Property(u => u.CoverPhoto).IsModified = true;
+                        await _context.SaveChangesAsync();
+                        
+                        TempData["SuccessMessage"] = "Cover photo updated successfully!";
+                        return RedirectToAction("Settings");
+                    }
+                    catch (Exception entityEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Entity approach also failed: {entityEx.Message}");
+                        throw;
+                    }
                 }
-
-                TempData["SuccessMessage"] = "Cover image updated successfully";
-                return RedirectToAction("Settings");
             }
             catch (Exception ex)
             {
@@ -371,7 +420,7 @@ namespace LinkedOut.Controllers
                 {
                     System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
                 }
-                TempData["ErrorMessage"] = "Failed to update cover image: " + ex.Message;
+                TempData["ErrorMessage"] = "An error occurred while updating your cover photo. Please try again later.";
                 return RedirectToAction("Settings");
             }
         }
@@ -426,6 +475,395 @@ namespace LinkedOut.Controllers
             {
                 System.Diagnostics.Debug.WriteLine($"UserProfile error: {ex.Message}");
                 return RedirectToAction("Index", "Home");
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveExperience(Experience model, string StartDate, string EndDate)
+        {
+            try
+            {
+                // Debug incoming data
+                System.Diagnostics.Debug.WriteLine($"SaveExperience: Received data - Company: {model.Company}, Position: {model.Position}, StartDate: {StartDate}, EndDate: {EndDate}, IsCurrentJob: {model.IsCurrentJob}");
+                
+                // Get the current user
+                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+                
+                // Validation
+                if (string.IsNullOrEmpty(model.Company))
+                {
+                    TempData["ErrorMessage"] = "Company name is required";
+                    return RedirectToAction("Settings");
+                }
+                    
+                if (string.IsNullOrEmpty(model.Position))
+                {
+                    TempData["ErrorMessage"] = "Position is required";
+                    return RedirectToAction("Settings");
+                }
+                    
+                // Parse dates from d/m/y format to DateTime
+                if (string.IsNullOrEmpty(StartDate))
+                {
+                    TempData["ErrorMessage"] = "Start date is required";
+                    return RedirectToAction("Settings");
+                }
+                
+                try
+                {
+                    // Parse start date (format: d/m/y)
+                    string[] startParts = StartDate.Split('/');
+                    if (startParts.Length == 3)
+                    {
+                        // Adjust for 2-digit year
+                        string year = startParts[2];
+                        if (year.Length == 2)
+                        {
+                            year = "20" + year; // Assuming 21st century
+                        }
+                        
+                        model.StartDate = new DateTime(int.Parse(year), int.Parse(startParts[1]), int.Parse(startParts[0]));
+                        System.Diagnostics.Debug.WriteLine($"Parsed start date: {model.StartDate}");
+                    }
+                    else
+                    {
+                        TempData["ErrorMessage"] = "Invalid start date format. Please use d/m/y format.";
+                        return RedirectToAction("Settings");
+                    }
+                    
+                    // Parse end date if provided and not current job
+                    if (!model.IsCurrentJob && !string.IsNullOrEmpty(EndDate))
+                    {
+                        string[] endParts = EndDate.Split('/');
+                        if (endParts.Length == 3)
+                        {
+                            // Adjust for 2-digit year
+                            string year = endParts[2];
+                            if (year.Length == 2)
+                            {
+                                year = "20" + year; // Assuming 21st century
+                            }
+                            
+                            model.EndDate = new DateTime(int.Parse(year), int.Parse(endParts[1]), int.Parse(endParts[0]));
+                            System.Diagnostics.Debug.WriteLine($"Parsed end date: {model.EndDate}");
+                        }
+                        else
+                        {
+                            TempData["ErrorMessage"] = "Invalid end date format. Please use d/m/y format.";
+                            return RedirectToAction("Settings");
+                        }
+                    }
+                    else if (!model.IsCurrentJob)
+                    {
+                        TempData["ErrorMessage"] = "End date is required when not current job";
+                        return RedirectToAction("Settings");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Date parsing error: {ex.Message}");
+                    TempData["ErrorMessage"] = "Error parsing dates. Please ensure they are in d/m/y format.";
+                    return RedirectToAction("Settings");
+                }
+                
+                // Handle null fields
+                model.City = model.City ?? string.Empty;
+                model.Description = model.Description ?? string.Empty;
+                    
+                // Assign to current user
+                model.UserId = userId;
+                model.CreatedAt = DateTime.UtcNow;
+                
+                System.Diagnostics.Debug.WriteLine($"Adding experience to database: User {userId}, Company {model.Company}, Position {model.Position}");
+                
+                _context.Experiences.Add(model);
+                await _context.SaveChangesAsync();
+                
+                System.Diagnostics.Debug.WriteLine($"Experience saved successfully with ID: {model.Id}");
+                
+                TempData["SuccessMessage"] = "Experience saved successfully!";
+                return RedirectToAction("Settings");
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                System.Diagnostics.Debug.WriteLine($"SaveExperience error: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                
+                // Include stack trace for debugging
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                TempData["ErrorMessage"] = $"An error occurred while saving the experience: {ex.Message}";
+                return RedirectToAction("Settings");
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetExperiences()
+        {
+            try
+            {
+                // Get the current user's ID
+                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+                
+                // Fetch the user's experiences
+                var experiences = await _context.Experiences
+                    .Where(e => e.UserId == userId)
+                    .OrderByDescending(e => e.StartDate)
+                    .ToListAsync();
+                
+                return JsonResponse(true, "Experiences retrieved successfully", experiences);
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                System.Diagnostics.Debug.WriteLine($"GetExperiences error: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return JsonResponse(false, "An error occurred while retrieving experiences");
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ChangePassword(string oldPassword, string newPassword, string confirmPassword)
+        {
+            System.Diagnostics.Debug.WriteLine("ChangePassword method called");
+            System.Diagnostics.Debug.WriteLine($"Received values - oldPassword length: {oldPassword?.Length ?? 0}, newPassword length: {newPassword?.Length ?? 0}, confirmPassword length: {confirmPassword?.Length ?? 0}");
+            
+            try
+            {
+                // Validate input
+                if (string.IsNullOrEmpty(oldPassword) || string.IsNullOrEmpty(newPassword) || string.IsNullOrEmpty(confirmPassword))
+                {
+                    System.Diagnostics.Debug.WriteLine("Password validation failed: One or more fields are empty");
+                    TempData["ErrorMessage"] = "All password fields are required";
+                    return RedirectToAction("Settings");
+                }
+
+                if (newPassword != confirmPassword)
+                {
+                    System.Diagnostics.Debug.WriteLine("Password validation failed: New password and confirmation don't match");
+                    TempData["ErrorMessage"] = "New password and confirmation do not match";
+                    return RedirectToAction("Settings");
+                }
+
+                // Minimum password requirements
+                if (newPassword.Length < 6)
+                {
+                    System.Diagnostics.Debug.WriteLine("Password validation failed: Password too short");
+                    TempData["ErrorMessage"] = "Password must be at least 6 characters long";
+                    return RedirectToAction("Settings");
+                }
+
+                // Get current user
+                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+                System.Diagnostics.Debug.WriteLine($"Finding user with ID: {userId}");
+                var user = await _context.Users.FindAsync(userId);
+
+                if (user == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("User not found in database");
+                    TempData["ErrorMessage"] = "User not found";
+                    return RedirectToAction("Settings");
+                }
+
+                System.Diagnostics.Debug.WriteLine($"User found: {user.Id}, {user.Email}");
+                System.Diagnostics.Debug.WriteLine($"Current password hash: {user.PasswordHash}");
+                System.Diagnostics.Debug.WriteLine($"Old password provided: {oldPassword}");
+
+                // Direct string comparison instead of BCrypt verification
+                bool isOldPasswordValid = (user.PasswordHash == oldPassword);
+                System.Diagnostics.Debug.WriteLine($"Old password verification result: {isOldPasswordValid}");
+                
+                if (!isOldPasswordValid)
+                {
+                    System.Diagnostics.Debug.WriteLine("Old password verification failed");
+                    TempData["ErrorMessage"] = "Current password is incorrect";
+                    return RedirectToAction("Settings");
+                }
+
+                // Update password directly without hashing
+                try
+                {
+                    user.PasswordHash = newPassword;
+                    System.Diagnostics.Debug.WriteLine("User password updated, saving changes...");
+                    
+                    await _context.SaveChangesAsync();
+                    System.Diagnostics.Debug.WriteLine("Changes saved successfully");
+                    
+                    TempData["SuccessMessage"] = "Password changed successfully";
+                    return RedirectToAction("Settings");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error updating password: {ex.Message}");
+                    throw; // Re-throw to be caught by outer catch block
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                System.Diagnostics.Debug.WriteLine($"ChangePassword error: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Inner exception stack trace: {ex.InnerException.StackTrace}");
+                }
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                TempData["ErrorMessage"] = "An error occurred while changing your password. Please try again later.";
+                return RedirectToAction("Settings");
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveEducation(Education model, string StartDate, string EndDate)
+        {
+            try
+            {
+                // Debug incoming data
+                System.Diagnostics.Debug.WriteLine($"SaveEducation: Received data - School: {model.School}, Degree: {model.Degree}, Field: {model.Field}, StartDate: {StartDate}, EndDate: {EndDate}");
+                
+                // Get the current user
+                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+                
+                // Validation
+                if (string.IsNullOrEmpty(model.School))
+                {
+                    TempData["ErrorMessage"] = "School name is required";
+                    return RedirectToAction("Settings");
+                }
+                    
+                if (string.IsNullOrEmpty(model.Degree))
+                {
+                    TempData["ErrorMessage"] = "Degree is required";
+                    return RedirectToAction("Settings");
+                }
+                    
+                // Parse dates from d/m/y format to DateTime
+                if (string.IsNullOrEmpty(StartDate))
+                {
+                    TempData["ErrorMessage"] = "Start date is required";
+                    return RedirectToAction("Settings");
+                }
+                
+                try
+                {
+                    // Parse start date (format: d/m/y)
+                    string[] startParts = StartDate.Split('/');
+                    if (startParts.Length == 3)
+                    {
+                        // Adjust for 2-digit year
+                        string year = startParts[2];
+                        if (year.Length == 2)
+                        {
+                            year = "20" + year; // Assuming 21st century
+                        }
+                        
+                        model.StartDate = new DateTime(int.Parse(year), int.Parse(startParts[1]), int.Parse(startParts[0]));
+                        System.Diagnostics.Debug.WriteLine($"Parsed start date: {model.StartDate}");
+                    }
+                    else
+                    {
+                        TempData["ErrorMessage"] = "Invalid start date format. Please use d/m/y format.";
+                        return RedirectToAction("Settings");
+                    }
+                    
+                    // Parse end date if provided
+                    if (!string.IsNullOrEmpty(EndDate))
+                    {
+                        string[] endParts = EndDate.Split('/');
+                        if (endParts.Length == 3)
+                        {
+                            // Adjust for 2-digit year
+                            string year = endParts[2];
+                            if (year.Length == 2)
+                            {
+                                year = "20" + year; // Assuming 21st century
+                            }
+                            
+                            model.EndDate = new DateTime(int.Parse(year), int.Parse(endParts[1]), int.Parse(endParts[0]));
+                            System.Diagnostics.Debug.WriteLine($"Parsed end date: {model.EndDate}");
+                        }
+                        else
+                        {
+                            TempData["ErrorMessage"] = "Invalid end date format. Please use d/m/y format.";
+                            return RedirectToAction("Settings");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Date parsing error: {ex.Message}");
+                    TempData["ErrorMessage"] = "Error parsing dates. Please ensure they are in d/m/y format.";
+                    return RedirectToAction("Settings");
+                }
+                
+                // Handle null fields
+                model.Field = model.Field ?? string.Empty;
+                model.Location = model.Location ?? string.Empty;
+                    
+                // Assign to current user
+                model.UserId = userId;
+                model.CreatedAt = DateTime.UtcNow;
+                
+                System.Diagnostics.Debug.WriteLine($"Adding education to database: User {userId}, School {model.School}, Degree {model.Degree}");
+                
+                _context.Educations.Add(model);
+                await _context.SaveChangesAsync();
+                
+                System.Diagnostics.Debug.WriteLine($"Education saved successfully with ID: {model.Id}");
+                
+                TempData["SuccessMessage"] = "Education saved successfully!";
+                return RedirectToAction("Settings");
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                System.Diagnostics.Debug.WriteLine($"SaveEducation error: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                
+                // Include stack trace for debugging
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                TempData["ErrorMessage"] = $"An error occurred while saving education: {ex.Message}";
+                return RedirectToAction("Settings");
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetEducations()
+        {
+            try
+            {
+                // Get the current user's ID
+                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+                
+                // Fetch the user's educations
+                var educations = await _context.Educations
+                    .Where(e => e.UserId == userId)
+                    .OrderByDescending(e => e.StartDate)
+                    .ToListAsync();
+                
+                return JsonResponse(true, "Educations retrieved successfully", educations);
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                System.Diagnostics.Debug.WriteLine($"GetEducations error: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return JsonResponse(false, "An error occurred while retrieving educations");
             }
         }
     }

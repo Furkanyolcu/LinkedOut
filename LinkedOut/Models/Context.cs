@@ -19,6 +19,8 @@ namespace LinkedOut.Models
         public DbSet<Course> Courses { get; set; }
         public DbSet<CourseEnrollment> CourseEnrollments { get; set; }
         public DbSet<CourseReview> CourseReviews { get; set; }
+        public DbSet<Experience> Experiences { get; set; }
+        public DbSet<Education> Educations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -128,6 +130,20 @@ namespace LinkedOut.Models
                 .WithMany()
                 .HasForeignKey(r => r.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+                
+            // Configure Experience
+            modelBuilder.Entity<Experience>()
+                .HasOne(e => e.User)
+                .WithMany(u => u.Experiences)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure Education
+            modelBuilder.Entity<Education>()
+                .HasOne(e => e.User)
+                .WithMany(u => u.Educations)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

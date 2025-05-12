@@ -27,6 +27,8 @@ namespace LinkedOut.Models
 
         public string ProfilePicture { get; set; } = string.Empty;
         
+        public string Phone { get; set; } = string.Empty;
+        
         // Try to match the database column name if it exists
         // If not, this property won't be mapped to the database
         // but we can still use it in our code
@@ -46,5 +48,7 @@ namespace LinkedOut.Models
         public virtual ICollection<Course> Courses { get; set; } = new List<Course>();
         public virtual ICollection<Message> SentMessages { get; set; } = new List<Message>();
         public virtual ICollection<Message> ReceivedMessages { get; set; } = new List<Message>();
+        public virtual ICollection<Experience> Experiences { get; set; } = new List<Experience>();
+        public virtual ICollection<Education> Educations { get; set; } = new List<Education>();
     }
 } 
