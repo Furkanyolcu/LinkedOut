@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LinkedOut.Models
 {
@@ -25,6 +26,13 @@ namespace LinkedOut.Models
         public string PasswordHash { get; set; } = string.Empty;
 
         public string ProfilePicture { get; set; } = string.Empty;
+        
+        // Try to match the database column name if it exists
+        // If not, this property won't be mapped to the database
+        // but we can still use it in our code
+        [Column("CoverPhoto")]
+        public string CoverPhoto { get; set; } = string.Empty;
+        
         public string Headline { get; set; } = string.Empty;
         public string? About { get; set; }
         public string Location { get; set; } = string.Empty;

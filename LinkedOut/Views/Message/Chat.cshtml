@@ -1,0 +1,124 @@
+@model IEnumerable<LinkedOut.Models.Message>
+@{
+    var currentUserId = ViewBag.CurrentUserId;
+    var otherUserId = ViewBag.OtherUserId;
+    var otherUserName = ViewBag.OtherUserName;
+}
+
+<div class="card chat-content">
+    <div class="card-header">
+        <div class="row justify-content-between">
+            <div class="col">
+                <div class="d-flex">
+                    <div class="avatar avatar-xl status-online">
+                        <div class="avatar-name rounded-circle"><span>@otherUserName.Substring(0, 1)</span></div>
+                    </div>
+                    <div class="flex-1 ms-2">
+                        <h5 class="mb-0 d-flex align-items-center">@otherUserName</h5>
+                        <div class="chat-info-status">
+                            <small class="text-success">Online</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body chat-body">
+        <div class="chat-messages-content" id="chat-messages-content-@otherUserId">
+            @foreach (var message in Model)
+            {
+                if (message.SenderId == currentUserId)
+                {
+                    <div class="message sent" data-message-id="@message.Id">
+                        <div class="message-content">@message.Content</div>
+                        <div class="message-time">
+                            @message.CreatedAt.ToString("HH:mm")
+                            <span class="message-status @(message.IsRead ? "read" : "sent")">
+                                <i class="fas @(message.IsRead ? "fa-check-double" : "fa-check")"></i>
+                            </span>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="message received" data-message-id="@message.Id">
+                        <div class="message-content">@message.Content</div>
+                        <div class="message-time">@message.CreatedAt.ToString("HH:mm")</div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="card-footer">
+        <form id="chat-form-@otherUserId" class="chat-form">
+            <input type="hidden" name="receiverId" value="@otherUserId" />
+            <div class="input-group">
+                <input type="text" name="content" class="form-control message-input" placeholder="Type your message..." autocomplete="off" />
+                <button type="submit" class="btn btn-primary send-button">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        // Connect to SignalR hub
+        var userId = @currentUserId;
+        var otherUserId = @otherUserId;
+        
+        // Join the chat
+        chatConnection.invoke("JoinChat", otherUserId).catch(function (err) {
+            console.error(err.toString());
+        });
+        
+        // Scroll to bottom of chat
+        var messageContainer = document.getElementById('chat-messages-content-' + otherUserId);
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+        
+        // Handle form submission
+        $("#chat-form-" + otherUserId).submit(function (e) {
+            e.preventDefault();
+            
+            var form = $(this);
+            var messageInput = form.find('.message-input');
+            var content = messageInput.val().trim();
+            
+            if (content) {
+                $.ajax({
+                    url: '/Message/Send',
+                    type: 'POST',
+                    data: {
+                        receiverId: otherUserId,
+                        content: content
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            // Add the message to the UI
+                            var currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            var newMessage = `
+                                <div class="message sent" data-message-id="${response.messageId}">
+                                    <div class="message-content">${content}</div>
+                                    <div class="message-time">
+                                        ${currentTime}
+                                        <span class="message-status sent">
+                                            <i class="fas fa-check"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                            `;
+                            $('#chat-messages-content-' + otherUserId).append(newMessage);
+                            messageInput.val('');
+                            
+                            // Scroll to bottom
+                            messageContainer.scrollTop = messageContainer.scrollHeight;
+                        }
+                    }
+                });
+            }
+        });
+    });
+</script> 

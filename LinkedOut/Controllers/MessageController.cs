@@ -2,16 +2,20 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LinkedOut.Models;
 using System.Security.Claims;
+using Microsoft.AspNetCore.SignalR;
+using LinkedOut.Hubs;
 
 namespace LinkedOut.Controllers
 {
     public class MessageController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IHubContext<ChatHub> _hubContext;
 
-        public MessageController(ApplicationDbContext context)
+        public MessageController(ApplicationDbContext context, IHubContext<ChatHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         public IActionResult Index()
@@ -75,6 +79,13 @@ namespace LinkedOut.Controllers
             }
             await _context.SaveChangesAsync();
 
+            // Notify sender through SignalR that messages were read
+            foreach (var message in unreadMessages)
+            {
+                await _hubContext.Clients.User(message.SenderId.ToString())
+                    .SendAsync("MessageRead", message.Id);
+            }
+
             ViewBag.CurrentUserId = currentUserId;
             ViewBag.OtherUserId = id;
             ViewBag.OtherUserName = otherUser.FirstName + " " + otherUser.LastName;
@@ -106,7 +117,21 @@ namespace LinkedOut.Controllers
             _context.Messages.Add(message);
             await _context.SaveChangesAsync();
 
-            return Json(new { success = true });
+            // Send message through SignalR
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            var senderName = currentUser.FirstName + " " + currentUser.LastName;
+
+            await _hubContext.Clients.User(receiverId.ToString())
+                .SendAsync("ReceiveMessage", new
+                {
+                    id = message.Id,
+                    senderId = currentUserId,
+                    senderName = senderName,
+                    content = content,
+                    timestamp = message.CreatedAt
+                });
+
+            return Json(new { success = true, messageId = message.Id });
         }
     }
 } 

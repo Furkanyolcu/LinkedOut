@@ -47,6 +47,11 @@ namespace LinkedOut.Controllers
 
             if (existingConnection != null)
             {
+                // AJAX çağrılarını desteklemek için JSON yanıtı ekliyorum
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return BadRequest(new { success = false, message = "Connection request already exists" });
+                }
                 return BadRequest("Connection request already exists");
             }
 
@@ -61,6 +66,11 @@ namespace LinkedOut.Controllers
             _context.Connections.Add(connection);
             await _context.SaveChangesAsync();
 
+            // AJAX çağrılarını desteklemek için JSON yanıtı ekliyorum
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+            {
+                return Json(new { success = true, message = "Connection request sent successfully" });
+            }
             return RedirectToAction("Index");
         }
 
